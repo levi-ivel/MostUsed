@@ -1,13 +1,20 @@
 import { Plugin } from 'obsidian';
-declare var Plotly: any;
+
+declare var Plotly: any; // Declare Plotly as a global variable
 
 export default class MostUsedWordsPlugin extends Plugin {
     async onload() {
         console.log('Most Used Words plugin loaded.');
 
+        this.addRibbonIcon('graph', 'Show Most Used Words Graph', async () => {
+            await this.showGraph();
+        });
+    }
+
+    async showGraph() {
         // Load Plotly.js
         const plotlyScript = document.createElement('script');
-        plotlyScript.src = 'plotly.js';
+        plotlyScript.src = 'plotly-latest.min.js'; // Update with the correct path
         document.head.appendChild(plotlyScript);
 
         plotlyScript.onload = () => {
