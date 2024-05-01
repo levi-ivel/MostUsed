@@ -1,7 +1,5 @@
 import { Plugin } from 'obsidian';
 
-declare var Plotly: any; // Declare Plotly as a global variable
-
 export default class MostUsedWordsPlugin extends Plugin {
     async onload() {
         console.log('Most Used Words plugin loaded.');
@@ -9,27 +7,27 @@ export default class MostUsedWordsPlugin extends Plugin {
         this.addRibbonIcon('graph', 'Show Most Used Words Graph', async () => {
             await this.showGraph();
         });
+
+        this.addCommand({
+            id: 'show-most-used-words-list',
+            name: 'Show Most Used Words List',
+            callback: async () => {
+                await this.showMostUsedWordsList();
+            }
+        });
     }
 
     async showGraph() {
-        // Load Plotly.js
-        const plotlyScript = document.createElement('script');
-        plotlyScript.src = 'plotly-latest.min.js'; // Update with the correct path
-        document.head.appendChild(plotlyScript);
-
-        plotlyScript.onload = () => {
-            // Plotly.js is now loaded, you can use it here
-            this.plotChart();
-        };
+        // Your code to display the graph using Plotly.js
     }
 
-    plotChart() {
+    async showMostUsedWordsList() {
         // Get all notes
         const notes = this.app.vault.getMarkdownFiles();
 
         // Count word occurrences
         const wordCountMap = new Map<string, number>();
-        notes.forEach(async (note) => {
+        for (const note of notes) {
             const content = await this.app.vault.read(note);
             const words = content.split(/\s+/);
             words.forEach((word: string) => {
@@ -39,7 +37,7 @@ export default class MostUsedWordsPlugin extends Plugin {
                     wordCountMap.set(normalizedWord, count + 1);
                 }
             });
-        });
+        }
 
         // Sort by word count
         const sortedWords = Array.from(wordCountMap.entries()).sort(
@@ -48,24 +46,12 @@ export default class MostUsedWordsPlugin extends Plugin {
 
         // Display top 100 most used words
         const topWords = sortedWords.slice(0, 100);
-        console.log('Top 100 Most Used Words:', topWords);
+        const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`).join('\n');
 
-        // Generate graph data
-        const data = [{
-            x: topWords.map(([word]) => word),
-            y: topWords.map(([_, count]) => count),
-            type: 'bar'
-        }];
-
-        // Set layout
-        const layout = {
-            title: 'Most Used Words',
-            xaxis: { title: 'Word' },
-            yaxis: { title: 'Frequency' }
-        };
-
-        // Plot the graph
-        Plotly.newPlot('word-chart', data, layout);
+        // Create a new Markdown file with the list of most used words
+        const fileName = 'MostUsedWordsList.md';
+        const fileContent = `# Top 100 Most Used Words\n\n${wordList}`;
+        await this.app.vault.create(fileName, fileContent);
     }
 
     onunload() {
