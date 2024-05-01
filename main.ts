@@ -1,11 +1,11 @@
-import { Plugin } from 'obsidian';
+import { Plugin, Notice } from 'obsidian';
 
 export default class MostUsedWordsPlugin extends Plugin {
     async onload() {
         console.log('Most Used Words plugin loaded.');
 
         this.addRibbonIcon('document', 'Show Most Used Words Graph', async () => {
-            await this.showGraph();
+            await this.showMostUsedWordsList();
         });
 
         this.addCommand({
@@ -15,10 +15,6 @@ export default class MostUsedWordsPlugin extends Plugin {
                 await this.showMostUsedWordsList();
             }
         });
-    }
-
-    async showGraph() {
-        // Your code to display the graph using Plotly.js
     }
 
     async showMostUsedWordsList() {
@@ -44,14 +40,11 @@ export default class MostUsedWordsPlugin extends Plugin {
             (a, b) => b[1] - a[1]
         );
 
-        // Display top 100 most used words
+        // Display top 100 most used words as a notice
         const topWords = sortedWords.slice(0, 100);
         const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`).join('\n');
 
-        // Create a new Markdown file with the list of most used words
-        const fileName = 'MostUsedWordsList.md';
-        const fileContent = `# Top 100 Most Used Words\n\n${wordList}`;
-        await this.app.vault.create(fileName, fileContent);
+        new Notice('Top 100 Most Used Words:\n' + wordList);
     }
 
     onunload() {
