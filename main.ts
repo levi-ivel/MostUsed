@@ -4,7 +4,7 @@ export default class MostUsedWordsPlugin extends Plugin {
     async onload() {
         console.log('Most Used Words plugin loaded.');
 
-        this.addRibbonIcon('graph', 'Show Most Used Words Graph', async () => {
+        this.addRibbonIcon('document', 'Show Most Used Words Graph', async () => {
             await this.showGraph();
         });
 
