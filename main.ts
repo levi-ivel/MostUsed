@@ -2,7 +2,6 @@ import { Plugin } from 'obsidian';
 
 export default class MostUsedWordsPlugin extends Plugin {
     onload() {
-        console.log('Most Used Words plugin loaded.');
 
         this.addRibbonIcon('document', 'Show Most Used Words Graph', async () => {
             await this.showMostUsedWordsList();
@@ -69,9 +68,5 @@ export default class MostUsedWordsPlugin extends Plugin {
         popupContent.style.overflowY = 'auto'; 
     
         return popup;
-    }
-
-    onunload() {
-        console.log('Most Used Words plugin unloaded.');
     }
 }
