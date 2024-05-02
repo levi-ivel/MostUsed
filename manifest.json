@@ -1,6 +1,6 @@
 {
-	"id": "WordGraph",
-	"name": "WordGraph",
+	"id": "MostUsed",
+	"name": "MostUsed",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
 	"description": "Creates a top 100 of the most used words in your notes",

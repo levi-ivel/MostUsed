@@ -50,23 +50,33 @@ export default class MostUsedWordsPlugin extends Plugin {
     createPopup(content: string) {
         const popup = document.createElement('div') as HTMLElement;
         popup.classList.add('my-popup');
-        popup.innerHTML = `
-            <div class="popup-content">
-                <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
-                <div class="content">${content}</div>
-            </div>
-        `;
     
+        const popupContent = document.createElement('div');
+        popupContent.classList.add('popup-content');
+    
+        const closeButton = document.createElement('span');
+        closeButton.classList.add('close');
+        closeButton.innerHTML = '&times;';
+        closeButton.onclick = () => popup.remove();
+    
+        const contentDiv = document.createElement('div');
+        contentDiv.innerHTML = content;
+    
+        popupContent.appendChild(closeButton);
+        popupContent.appendChild(contentDiv);
+        popup.appendChild(popupContent);
+    
+        // Applying CSS styles
         popup.style.position = 'fixed';
-        popup.style.top = '100px'; 
+        popup.style.top = '100px'; // Adjust this value as needed
         popup.style.left = '96%';
         popup.style.transform = 'translateX(-50%)';
-        
-        
-        const popupContent = popup.querySelector('.content') as HTMLElement;
-        popupContent.style.maxHeight = '500px'; 
-        popupContent.style.overflowY = 'auto'; 
+    
+        // Setting maximum height for the content
+        contentDiv.style.maxHeight = '300px'; // Adjust this value as needed
+        contentDiv.style.overflowY = 'auto'; // Enable vertical scrolling
     
         return popup;
     }
+    
 }
