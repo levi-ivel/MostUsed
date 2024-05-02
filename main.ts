@@ -57,23 +57,19 @@ export default class MostUsedWordsPlugin extends Plugin {
                 <div class="content">${content}</div>
             </div>
         `;
-        // Applying CSS styles
+    
         popup.style.position = 'fixed';
-        popup.style.top = '100px'; // Adjust this value as needed
+        popup.style.top = '100px'; 
         popup.style.left = '96%';
         popup.style.transform = 'translateX(-50%)';
         
-        // Setting maximum height for the content
+        
         const popupContent = popup.querySelector('.content') as HTMLElement;
-        popupContent.style.maxHeight = '500px'; // Adjust this value as needed
-        popupContent.style.overflowY = 'auto'; // Enable vertical scrolling
+        popupContent.style.maxHeight = '500px'; 
+        popupContent.style.overflowY = 'auto'; 
     
         return popup;
     }
-    
-    
-    
-    
 
     onunload() {
         console.log('Most Used Words plugin unloaded.');
