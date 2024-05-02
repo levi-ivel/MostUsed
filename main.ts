@@ -1,7 +1,7 @@
-import { Plugin, Notice } from 'obsidian';
+import { Plugin } from 'obsidian';
 
 export default class MostUsedWordsPlugin extends Plugin {
-    async onload() {
+    onload() {
         console.log('Most Used Words plugin loaded.');
 
         this.addRibbonIcon('document', 'Show Most Used Words Graph', async () => {
@@ -22,11 +22,11 @@ export default class MostUsedWordsPlugin extends Plugin {
         const notes = this.app.vault.getMarkdownFiles();
 
         // Count word occurrences
-        const wordCountMap = new Map<string, number>();
+        const wordCountMap = new Map();
         for (const note of notes) {
             const content = await this.app.vault.read(note);
             const words = content.split(/\s+/);
-            words.forEach((word: string) => {
+            words.forEach(word => {
                 const normalizedWord = word.toLowerCase();
                 if (normalizedWord.length > 0) {
                     const count = wordCountMap.get(normalizedWord) || 0;
@@ -40,12 +40,40 @@ export default class MostUsedWordsPlugin extends Plugin {
             (a, b) => b[1] - a[1]
         );
 
-        // Display top 100 most used words as a notice
+        // Display top 100 most used words in a popup window
         const topWords = sortedWords.slice(0, 100);
-        const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`).join('\n');
+        const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`).join('<br>');
 
-        new Notice('Top 100 Most Used Words:\n' + wordList);
+        const popup = this.createPopup(wordList);
+        this.app.workspace.containerEl.appendChild(popup);
     }
+
+    createPopup(content: string) {
+        const popup = document.createElement('div') as HTMLElement;
+        popup.classList.add('my-popup');
+        popup.innerHTML = `
+            <div class="popup-content">
+                <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
+                <div class="content">${content}</div>
+            </div>
+        `;
+        // Applying CSS styles
+        popup.style.position = 'fixed';
+        popup.style.top = '100px'; // Adjust this value as needed
+        popup.style.left = '96%';
+        popup.style.transform = 'translateX(-50%)';
+        
+        // Setting maximum height for the content
+        const popupContent = popup.querySelector('.content') as HTMLElement;
+        popupContent.style.maxHeight = '500px'; // Adjust this value as needed
+        popupContent.style.overflowY = 'auto'; // Enable vertical scrolling
+    
+        return popup;
+    }
+    
+    
+    
+    
 
     onunload() {
         console.log('Most Used Words plugin unloaded.');

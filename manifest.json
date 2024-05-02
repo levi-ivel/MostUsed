@@ -3,10 +3,10 @@
 	"name": "WordGraph",
 	"version": "1.0.0",
 	"minAppVersion": "0.15.0",
-	"description": "Creates a top 100 of the most used words in your files and makes a graph from them.",
+	"description": "Creates a top 100 of the most used words in your notes",
 	"author": "Obsidian",
-	"authorUrl": "https://obsidian.md",
-	"fundingUrl": "https://obsidian.md/pricing",
+	"authorUrl": "https://github.com/levi-ivel",
+	"fundingUrl": "",
 	"isDesktopOnly": false
 }
 
