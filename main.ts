@@ -1,7 +1,16 @@
-import { Plugin } from 'obsidian';
+import { Plugin, TAbstractFile } from 'obsidian';
 
 export default class MostUsedWordsPlugin extends Plugin {
+    private createdEventListener: ((file: TAbstractFile) => void) | null = null;
+
     onload() {
+
+        this.createdEventListener = (file: TAbstractFile) => {
+        };
+
+        if (this.createdEventListener) {
+            this.app.vault.on("create", this.createdEventListener);
+        }
 
         this.addRibbonIcon('document', 'Show Most Used Words Graph', async () => {
             await this.showMostUsedWordsList();
@@ -68,15 +77,20 @@ export default class MostUsedWordsPlugin extends Plugin {
     
         // Applying CSS styles
         popup.style.position = 'fixed';
-        popup.style.top = '100px'; // Adjust this value as needed
+        popup.style.top = '100px'; 
         popup.style.left = '96%';
         popup.style.transform = 'translateX(-50%)';
-    
-        // Setting maximum height for the content
-        contentDiv.style.maxHeight = '300px'; // Adjust this value as needed
+        contentDiv.style.maxHeight = '300px'; 
         contentDiv.style.overflowY = 'auto'; // Enable vertical scrolling
     
         return popup;
     }
-    
+
+    onunload() {
+
+        if (this.createdEventListener) {
+            this.app.vault.off("create", this.createdEventListener);
+            this.createdEventListener = null;
+        }
+    }
 }
