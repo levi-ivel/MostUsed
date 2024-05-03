@@ -1,0 +1,11 @@
+.my-popup {
+    position: fixed;
+    top: 100px;
+    left: 96%;
+    transform: translateX(-50%);
+}
+
+.popup-content > div {
+    max-height: 300px;
+    overflow-y: auto;
+}

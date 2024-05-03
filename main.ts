@@ -1,15 +1,12 @@
-import { Plugin, TAbstractFile } from 'obsidian';
+import { Plugin, TAbstractFile, Vault } from 'obsidian';
 
 export default class MostUsedWordsPlugin extends Plugin {
     private createdEventListener: ((file: TAbstractFile) => void) | null = null;
 
     onload() {
-
-        this.createdEventListener = (file: TAbstractFile) => {
-        };
-
+        this.createdEventListener = this.handleFileCreation.bind(this);
         if (this.createdEventListener) {
-            this.app.vault.on("create", this.createdEventListener);
+            this.registerEvent(this.app.vault.on("create", this.createdEventListener));
         }
 
         this.addRibbonIcon('document', 'Show Most Used Words Graph', async () => {
@@ -25,14 +22,19 @@ export default class MostUsedWordsPlugin extends Plugin {
         });
     }
 
+    handleFileCreation(file: TAbstractFile) {
+        // Handle file creation event
+    }
+
     async showMostUsedWordsList() {
         // Get all notes
-        const notes = this.app.vault.getMarkdownFiles();
+        const vault = this.app.vault;
+        const notes = vault.getMarkdownFiles();
 
         // Count word occurrences
-        const wordCountMap = new Map();
+        const wordCountMap = new Map<string, number>();
         for (const note of notes) {
-            const content = await this.app.vault.read(note);
+            const content = await vault.read(note);
             const words = content.split(/\s+/);
             words.forEach(word => {
                 const normalizedWord = word.toLowerCase();
@@ -50,14 +52,14 @@ export default class MostUsedWordsPlugin extends Plugin {
 
         // Display top 100 most used words in a popup window
         const topWords = sortedWords.slice(0, 100);
-        const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`).join('<br>');
+        const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`);
 
         const popup = this.createPopup(wordList);
         this.app.workspace.containerEl.appendChild(popup);
     }
 
-    createPopup(content: string) {
-        const popup = document.createElement('div') as HTMLElement;
+    createPopup(wordList: string[]) {
+        const popup = document.createElement('div');
         popup.classList.add('my-popup');
     
         const popupContent = document.createElement('div');
@@ -65,29 +67,24 @@ export default class MostUsedWordsPlugin extends Plugin {
     
         const closeButton = document.createElement('span');
         closeButton.classList.add('close');
-        closeButton.innerHTML = '&times;';
+        closeButton.textContent = '×';
         closeButton.onclick = () => popup.remove();
     
         const contentDiv = document.createElement('div');
-        contentDiv.innerHTML = content;
+        wordList.forEach(item => {
+            const itemDiv = document.createElement('div');
+            itemDiv.textContent = item;
+            contentDiv.appendChild(itemDiv);
+        });
     
         popupContent.appendChild(closeButton);
         popupContent.appendChild(contentDiv);
         popup.appendChild(popupContent);
     
-        // Applying CSS styles
-        popup.style.position = 'fixed';
-        popup.style.top = '100px'; 
-        popup.style.left = '96%';
-        popup.style.transform = 'translateX(-50%)';
-        contentDiv.style.maxHeight = '300px'; 
-        contentDiv.style.overflowY = 'auto'; // Enable vertical scrolling
-    
         return popup;
     }
 
     onunload() {
-
         if (this.createdEventListener) {
             this.app.vault.off("create", this.createdEventListener);
             this.createdEventListener = null;
