@@ -6,15 +6,15 @@ export default class MostUsedWordsPlugin extends Plugin {
     public activeView: MostUsedWordsView | null = null;
 
     onload() {
-        this.addRibbonIcon('document', 'Show Most Used Words List', async () => {
-            await this.showMostUsedWordsList();
+        this.addRibbonIcon('document', 'Show Most Used Words graph', async () => {
+            await this.showMostUsedWordsGraph();
         });
 
         this.addCommand({
-            id: 'show-most-used-words-list',
-            name: 'Show Most Used Words List',
+            id: 'show-most-used-words-graph',
+            name: 'Show Most Used Words graph',
             callback: async () => {
-                await this.showMostUsedWordsList();
+                await this.showMostUsedWordsGraph();
             }
         });
 
@@ -23,11 +23,11 @@ export default class MostUsedWordsPlugin extends Plugin {
         this.registerEvent(this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange.bind(this)));
 
         this.registerEvent(this.app.workspace.on('quit', () => {
-            this.closeMostUsedWordsList();
+            this.closeMostUsedWordsGraph();
         }));
     }
 
-    async showMostUsedWordsList() {
+    async showMostUsedWordsGraph() {
         if (!this.activeView) {
             await this.calculateWordCountMap();
             const sortedWords = this.getSortedWords();
@@ -89,7 +89,7 @@ export default class MostUsedWordsPlugin extends Plugin {
         }
     }
 
-    closeMostUsedWordsList() {
+    closeMostUsedWordsGraph() {
         if (this.activeView) {
             this.activeView.unload();
         }
@@ -98,7 +98,7 @@ export default class MostUsedWordsPlugin extends Plugin {
 
     onunload() {
         this.wordCountMap.clear();
-        this.closeMostUsedWordsList();
+        this.closeMostUsedWordsGraph();
     }
 }
 
