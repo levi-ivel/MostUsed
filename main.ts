@@ -1,8 +1,9 @@
 import { Plugin, WorkspaceLeaf, View, TFile } from 'obsidian';
+import Chart from 'chart.js/auto';
 
 export default class MostUsedWordsPlugin extends Plugin {
     private wordCountMap: Map<string, number> = new Map();
-    private activeView: MostUsedWordsView | null = null;
+    public activeView: MostUsedWordsView | null = null;
 
     onload() {
         this.addRibbonIcon('document', 'Show Most Used Words List', async () => {
@@ -18,22 +19,29 @@ export default class MostUsedWordsPlugin extends Plugin {
         });
 
         this.registerEvent(this.app.workspace.on('file-open', this.handleFileOpen.bind(this)));
+        this.registerEvent(this.app.workspace.on('editor-change', this.handleEditorChange.bind(this)));
+        this.registerEvent(this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange.bind(this)));
+
+        // Close tab when Obsidian is reloaded
+        this.registerEvent(this.app.workspace.on('quit', () => {
+            this.closeMostUsedWordsList();
+        }));
     }
 
     async showMostUsedWordsList() {
-        if (this.wordCountMap.size === 0) {
+        if (!this.activeView) {
             await this.calculateWordCountMap();
+            const sortedWords = this.getSortedWords();
+            const topWords = sortedWords.slice(0, 10); // Limit to top 10 words
+            const labels = topWords.map(([word]) => word);
+            const data = topWords.map(([_, count]) => count);
+            const leaf = this.app.workspace.getLeaf();
+            const view = new MostUsedWordsView(leaf, labels, data, this); // Pass 'this' as the plugin instance
+            leaf.open(view);
+            this.activeView = view;
         }
-
-        const sortedWords = this.getSortedWords();
-        const topWords = sortedWords.slice(0, 100);
-        const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`);
-
-        const leaf = this.app.workspace.getLeaf();
-        const view = new MostUsedWordsView(leaf, wordList);
-        leaf.open(view);
-        this.activeView = view;
     }
+    
 
     async calculateWordCountMap() {
         this.wordCountMap.clear();
@@ -45,7 +53,7 @@ export default class MostUsedWordsPlugin extends Plugin {
             const content = await vault.read(note);
             const words = content.split(/\s+/);
             words.forEach(word => {
-                const normalizedWord = word.toLowerCase();
+                const normalizedWord = word.toLowerCase().replace(/[^a-zA-Z0-9]/g, '');
                 if (normalizedWord.length > 0) {
                     const count = this.wordCountMap.get(normalizedWord) || 0;
                     this.wordCountMap.set(normalizedWord, count + 1);
@@ -53,13 +61,13 @@ export default class MostUsedWordsPlugin extends Plugin {
             });
         }
 
-        // If a view is active, update its content
         if (this.activeView) {
             const sortedWords = this.getSortedWords();
-            const topWords = sortedWords.slice(0, 100);
-            const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`);
-
-            this.activeView.updateContent(wordList);
+            const topWords = sortedWords.slice(0, 10); // Limit to top 10 words
+            const labels = topWords.map(([word]) => word);
+            const data = topWords.map(([_, count]) => count);
+            this.activeView.updateContent(labels, data);
+            this.activeView.setTabText();
         }
     }
 
@@ -68,21 +76,44 @@ export default class MostUsedWordsPlugin extends Plugin {
     }
 
     handleFileOpen(file: TFile) {
-        // Update word count map when a file is opened
         this.calculateWordCountMap();
     }
 
+    handleEditorChange() {
+        this.calculateWordCountMap();
+    }
+
+    handleActiveLeafChange(leaf: WorkspaceLeaf | null) {
+        if (leaf && leaf.view instanceof MostUsedWordsView) {
+            this.activeView = leaf.view;
+            this.calculateWordCountMap();
+        }
+    }
+
+    closeMostUsedWordsList() {
+        if (this.activeView) {
+            this.activeView.unload();
+        }
+    }
+    
+
     onunload() {
         this.wordCountMap.clear();
+        this.closeMostUsedWordsList();
     }
 }
 
 class MostUsedWordsView extends View {
-    wordList: string[];
+    labels: string[];
+    data: number[];
+    chart: Chart | null = null;
+    plugin: MostUsedWordsPlugin;
 
-    constructor(leaf: WorkspaceLeaf, wordList: string[]) {
+    constructor(leaf: WorkspaceLeaf, labels: string[], data: number[], plugin: MostUsedWordsPlugin) {
         super(leaf);
-        this.wordList = wordList;
+        this.labels = labels;
+        this.data = data;
+        this.plugin = plugin;
     }
 
     getViewType() {
@@ -90,28 +121,74 @@ class MostUsedWordsView extends View {
     }
 
     getDisplayText() {
-        return 'Most Used Words'; // This is for when you drag it around
+        return 'Most Used Words';
     }
 
     onload() {
-        this.containerEl.addClass('markdown-preview-view'); // Apply markdown preview view styles
-        this.containerEl.style.overflow = 'auto'; // Enable scroll if content overflows
-
-        this.updateContent(this.wordList);
+        this.containerEl.addClass('most-used-words-view');
+        this.renderChart();
     }
 
-    updateContent(wordList: string[]) {
-        this.containerEl.empty(); // Clear existing content
+    updateContent(labels: string[], data: number[]) {
+        this.labels = labels;
+        this.data = data;
+        if (this.chart) {
+            this.chart.data.labels = labels;
+            this.chart.data.datasets[0].data = data;
+            this.chart.update();
+        }
+    }
 
-        const contentDiv = document.createElement('div');
-        contentDiv.classList.add('markdown-preview-view-content');
+    renderChart() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 300;
+        this.containerEl.appendChild(canvas);
 
-        wordList.forEach(item => {
-            const itemDiv = document.createElement('div');
-            itemDiv.textContent = item;
-            contentDiv.appendChild(itemDiv);
-        });
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            this.chart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: this.labels,
+                    datasets: [{
+                        label: 'Word Count',
+                        data: this.data,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    }
 
-        this.containerEl.appendChild(contentDiv);
+    setTabText() {
+        const leafTitle = this.app.workspace.activeLeaf?.getViewState().type;
+        if (leafTitle) {
+            this.app.workspace.activeLeaf?.setEphemeralState({
+                ...this.app.workspace.activeLeaf?.getEphemeralState(),
+                title: 'Most Used Words'
+            });
+        }
+    }
+
+    unload() {
+        if (this.chart) {
+            this.chart.destroy();
+            this.chart = null;
+        }
+        super.unload();
+        if (this.plugin) {
+            this.plugin.activeView = null; // Notify the plugin that the view is closed
+        }
     }
 }
+
