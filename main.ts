@@ -1,15 +1,11 @@
-import { Plugin, TAbstractFile, Vault } from 'obsidian';
+import { Plugin, WorkspaceLeaf, View, TFile } from 'obsidian';
 
 export default class MostUsedWordsPlugin extends Plugin {
-    private createdEventListener: ((file: TAbstractFile) => void) | null = null;
+    private wordCountMap: Map<string, number> = new Map();
+    private activeView: MostUsedWordsView | null = null;
 
     onload() {
-        this.createdEventListener = this.handleFileCreation.bind(this);
-        if (this.createdEventListener) {
-            this.registerEvent(this.app.vault.on("create", this.createdEventListener));
-        }
-
-        this.addRibbonIcon('document', 'Show Most Used Words Graph', async () => {
+        this.addRibbonIcon('document', 'Show Most Used Words List', async () => {
             await this.showMostUsedWordsList();
         });
 
@@ -20,74 +16,102 @@ export default class MostUsedWordsPlugin extends Plugin {
                 await this.showMostUsedWordsList();
             }
         });
-    }
 
-    handleFileCreation(file: TAbstractFile) {
-        // Handle file creation event
+        this.registerEvent(this.app.workspace.on('file-open', this.handleFileOpen.bind(this)));
     }
 
     async showMostUsedWordsList() {
-        // Get all notes
+        if (this.wordCountMap.size === 0) {
+            await this.calculateWordCountMap();
+        }
+
+        const sortedWords = this.getSortedWords();
+        const topWords = sortedWords.slice(0, 100);
+        const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`);
+
+        const leaf = this.app.workspace.getLeaf();
+        const view = new MostUsedWordsView(leaf, wordList);
+        leaf.open(view);
+        this.activeView = view;
+    }
+
+    async calculateWordCountMap() {
+        this.wordCountMap.clear();
+
         const vault = this.app.vault;
         const notes = vault.getMarkdownFiles();
 
-        // Count word occurrences
-        const wordCountMap = new Map<string, number>();
         for (const note of notes) {
             const content = await vault.read(note);
             const words = content.split(/\s+/);
             words.forEach(word => {
                 const normalizedWord = word.toLowerCase();
                 if (normalizedWord.length > 0) {
-                    const count = wordCountMap.get(normalizedWord) || 0;
-                    wordCountMap.set(normalizedWord, count + 1);
+                    const count = this.wordCountMap.get(normalizedWord) || 0;
+                    this.wordCountMap.set(normalizedWord, count + 1);
                 }
             });
         }
 
-        // Sort by word count
-        const sortedWords = Array.from(wordCountMap.entries()).sort(
-            (a, b) => b[1] - a[1]
-        );
+        // If a view is active, update its content
+        if (this.activeView) {
+            const sortedWords = this.getSortedWords();
+            const topWords = sortedWords.slice(0, 100);
+            const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`);
 
-        // Display top 100 most used words in a popup window
-        const topWords = sortedWords.slice(0, 100);
-        const wordList = topWords.map(([word, count], index) => `${index + 1}: ${word} (${count})`);
-
-        const popup = this.createPopup(wordList);
-        this.app.workspace.containerEl.appendChild(popup);
+            this.activeView.updateContent(wordList);
+        }
     }
 
-    createPopup(wordList: string[]) {
-        const popup = document.createElement('div');
-        popup.classList.add('my-popup');
-    
-        const popupContent = document.createElement('div');
-        popupContent.classList.add('popup-content');
-    
-        const closeButton = document.createElement('span');
-        closeButton.classList.add('close');
-        closeButton.textContent = '×';
-        closeButton.onclick = () => popup.remove();
-    
+    getSortedWords() {
+        return Array.from(this.wordCountMap.entries()).sort((a, b) => b[1] - a[1]);
+    }
+
+    handleFileOpen(file: TFile) {
+        // Update word count map when a file is opened
+        this.calculateWordCountMap();
+    }
+
+    onunload() {
+        this.wordCountMap.clear();
+    }
+}
+
+class MostUsedWordsView extends View {
+    wordList: string[];
+
+    constructor(leaf: WorkspaceLeaf, wordList: string[]) {
+        super(leaf);
+        this.wordList = wordList;
+    }
+
+    getViewType() {
+        return 'most-used-words-view';
+    }
+
+    getDisplayText() {
+        return 'Most Used Words'; // This is for when you drag it around
+    }
+
+    onload() {
+        this.containerEl.addClass('markdown-preview-view'); // Apply markdown preview view styles
+        this.containerEl.style.overflow = 'auto'; // Enable scroll if content overflows
+
+        this.updateContent(this.wordList);
+    }
+
+    updateContent(wordList: string[]) {
+        this.containerEl.empty(); // Clear existing content
+
         const contentDiv = document.createElement('div');
+        contentDiv.classList.add('markdown-preview-view-content');
+
         wordList.forEach(item => {
             const itemDiv = document.createElement('div');
             itemDiv.textContent = item;
             contentDiv.appendChild(itemDiv);
         });
-    
-        popupContent.appendChild(closeButton);
-        popupContent.appendChild(contentDiv);
-        popup.appendChild(popupContent);
-    
-        return popup;
-    }
 
-    onunload() {
-        if (this.createdEventListener) {
-            this.app.vault.off("create", this.createdEventListener);
-            this.createdEventListener = null;
-        }
+        this.containerEl.appendChild(contentDiv);
     }
 }

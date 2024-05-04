@@ -9,3 +9,8 @@
     max-height: 300px;
     overflow-y: auto;
 }
+
+.tab .tab-name[data-type='most-used-words-view'] {
+    /* Set the tab text to "Most Used Words" */
+    content: 'Most Used Words';
+}
