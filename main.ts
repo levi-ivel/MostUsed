@@ -22,7 +22,6 @@ export default class MostUsedWordsPlugin extends Plugin {
         this.registerEvent(this.app.workspace.on('editor-change', this.handleEditorChange.bind(this)));
         this.registerEvent(this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange.bind(this)));
 
-        // Close tab when Obsidian is reloaded
         this.registerEvent(this.app.workspace.on('quit', () => {
             this.closeMostUsedWordsList();
         }));
@@ -32,11 +31,11 @@ export default class MostUsedWordsPlugin extends Plugin {
         if (!this.activeView) {
             await this.calculateWordCountMap();
             const sortedWords = this.getSortedWords();
-            const topWords = sortedWords.slice(0, 10); // Limit to top 10 words
+            const topWords = sortedWords.slice(0, 100);
             const labels = topWords.map(([word]) => word);
             const data = topWords.map(([_, count]) => count);
             const leaf = this.app.workspace.getLeaf();
-            const view = new MostUsedWordsView(leaf, labels, data, this); // Pass 'this' as the plugin instance
+            const view = new MostUsedWordsView(leaf, labels, data, this);
             leaf.open(view);
             this.activeView = view;
         }
@@ -63,7 +62,7 @@ export default class MostUsedWordsPlugin extends Plugin {
 
         if (this.activeView) {
             const sortedWords = this.getSortedWords();
-            const topWords = sortedWords.slice(0, 10); // Limit to top 10 words
+            const topWords = sortedWords.slice(0, 100);
             const labels = topWords.map(([word]) => word);
             const data = topWords.map(([_, count]) => count);
             this.activeView.updateContent(labels, data);
@@ -125,7 +124,6 @@ class MostUsedWordsView extends View {
     }
 
     onload() {
-        this.containerEl.addClass('most-used-words-view');
         this.renderChart();
     }
 
@@ -187,7 +185,7 @@ class MostUsedWordsView extends View {
         }
         super.unload();
         if (this.plugin) {
-            this.plugin.activeView = null; // Notify the plugin that the view is closed
+            this.plugin.activeView = null;
         }
     }
 }
