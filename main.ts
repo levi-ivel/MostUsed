@@ -1,22 +1,23 @@
 import { Plugin, WorkspaceLeaf, View, TFile } from 'obsidian';
 import Chart from 'chart.js/auto';
 
+
 export default class MostUsedWordsPlugin extends Plugin {
     private wordCountMap: Map<string, number> = new Map();
     public activeView: MostUsedWordsView | null = null;
 
     onload() {
-        this.addRibbonIcon('document', 'Show Most Used Words graph', async () => {
+        this.addRibbonIcon('document', 'Show Most Used Words Graph', async () => {
             await this.showMostUsedWordsGraph();
         });
 
         this.addCommand({
             id: 'show-most-used-words-graph',
-            name: 'Show Most Used Words graph',
+            name: 'Show Most Used Words Graph',
             callback: async () => {
                 await this.showMostUsedWordsGraph();
             }
-        });
+        }); 
 
         this.registerEvent(this.app.workspace.on('file-open', this.handleFileOpen.bind(this)));
         this.registerEvent(this.app.workspace.on('editor-change', this.handleEditorChange.bind(this)));
@@ -120,7 +121,7 @@ class MostUsedWordsView extends View {
     }
 
     getDisplayText() {
-        return 'Most Used Words';
+        return 'Most Used Words Graph';
     }
 
     onload() {
@@ -150,11 +151,8 @@ class MostUsedWordsView extends View {
                 data: {
                     labels: this.labels,
                     datasets: [{
-                        label: 'Word Count',
-                        data: this.data,
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        borderWidth: 1
+                        label: 'Most Used Words Graph',
+                        data: this.data
                     }]
                 },
                 options: {
@@ -169,11 +167,12 @@ class MostUsedWordsView extends View {
     }
 
     setTabText() {
-        const leafTitle = this.app.workspace.activeLeaf?.getViewState().type;
-        if (leafTitle) {
-            this.app.workspace.activeLeaf?.setEphemeralState({
-                ...this.app.workspace.activeLeaf?.getEphemeralState(),
-                title: 'Most Used Words'
+        const leaf = this.app.workspace.getLeavesOfType('markdown').find(leaf => leaf.view instanceof MostUsedWordsView);
+        if (leaf) {
+            const title = 'Most Used Words';
+            leaf.setEphemeralState({
+                ...leaf.getEphemeralState(),
+                title: title
             });
         }
     }
