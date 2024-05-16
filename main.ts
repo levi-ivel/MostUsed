@@ -7,13 +7,13 @@ export default class MostUsedWordsPlugin extends Plugin {
     public activeView: MostUsedWordsView | null = null;
 
     onload() {
-        this.addRibbonIcon('document', 'Show Most Used Words Graph', async () => {
+        this.addRibbonIcon('document', 'Show most used words graph', async () => {
             await this.showMostUsedWordsGraph();
         });
 
         this.addCommand({
             id: 'show-most-used-words-graph',
-            name: 'Show Most Used Words Graph',
+            name: 'Show most used words graph',
             callback: async () => {
                 await this.showMostUsedWordsGraph();
             }
@@ -121,7 +121,7 @@ class MostUsedWordsView extends View {
     }
 
     getDisplayText() {
-        return 'Most Used Words Graph';
+        return 'Most used words graph';
     }
 
     onload() {
@@ -151,7 +151,7 @@ class MostUsedWordsView extends View {
                 data: {
                     labels: this.labels,
                     datasets: [{
-                        label: 'Most Used Words Graph',
+                        label: 'Word count',
                         data: this.data
                     }]
                 },
@@ -167,9 +167,9 @@ class MostUsedWordsView extends View {
     }
 
     setTabText() {
-        const leaf = this.app.workspace.getLeavesOfType('markdown').find(leaf => leaf.view instanceof MostUsedWordsView);
+        const leaf = this.leaf;
         if (leaf) {
-            const title = 'Most Used Words';
+            const title = 'Most used words';
             leaf.setEphemeralState({
                 ...leaf.getEphemeralState(),
                 title: title
