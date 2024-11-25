@@ -138,7 +138,7 @@ export default class MostUsedWordsPlugin extends Plugin {
         }
 
         if (this.settings.excludeCommonWords) {
-            const commonWords = new Set(['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i']); 
+            const commonWords = new Set(['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'me', 'they', 'is', 'it']); 
             wordCountMap.forEach((count, word) => {
                 if (commonWords.has(word)) {
                     wordCountMap.delete(word);
@@ -365,7 +365,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Folder Name')
-            .setDesc('Enter the name of the folder (use / if nested in another folder E.g: bigfoldername/smallfoldername))')
+            .setDesc('Enter the name of the folder (use / if nested in another folder E.g: bigfoldername/smallfoldername)')
             .addText(text => text
                 .setValue(this.plugin.settings.folderPath)
                 .onChange(async (value: string) => {
@@ -376,7 +376,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
 
         new Setting(containerEl)
             .setName('Note Name')
-            .setDesc('Enter the name of the note (use / if nested in a folder E.g: foldername/notename))')
+            .setDesc('Enter the name of the note (use / if nested in a folder E.g: foldername/notename)')
             .addText(text => text
                 .setValue(this.plugin.settings.notePath)
                 .onChange(async (value: string) => {
@@ -384,5 +384,57 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                     await this.plugin.saveSettings();
                     this.plugin.calculateWordCountMap();
                 }));
+
+        new Setting(containerEl)
+            .setName('View Full Word List')
+            .setDesc('View and export the complete word list with their frequencies')
+            .addButton(button => button
+                .setButtonText('Show List')
+                .onClick(() => this.showFullWordList(containerEl)));
+    }
+
+    showFullWordList(containerEl: HTMLElement) {
+        containerEl.empty();
+        containerEl.createEl('h2', { text: 'Complete Word List' });
+
+        const wordListContainer = containerEl.createEl('div', { cls: 'word-list-container' });
+
+        const sortedWords = this.plugin.getSortedWords();
+        sortedWords.forEach(([word, count]) => {
+            wordListContainer.createEl('div', { text: `${word}: ${count}` });
+        });
+
+        const buttonContainer = containerEl.createEl('div', { cls: 'button-container' });
+
+        buttonContainer.createEl('button', { text: 'Copy to Clipboard' }).addEventListener('click', () => {
+            const text = sortedWords.map(([word, count]) => `${word}: ${count}`).join('\n');
+            navigator.clipboard.writeText(text);
+        });
+
+        buttonContainer.createEl('button', { text: 'Export as .txt' }).addEventListener('click', async () => {
+            const text = sortedWords.map(([word, count]) => `${word}: ${count}`).join('\n');
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'word-list.txt';
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+
+        buttonContainer.createEl('button', { text: 'Export as .json' }).addEventListener('click', async () => {
+            const json = JSON.stringify(Object.fromEntries(sortedWords), null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'word-list.json';
+            link.click();
+            URL.revokeObjectURL(url);
+        });
+
+        buttonContainer.createEl('button', { text: 'Back to Settings' }).addEventListener('click', () => {
+            this.display();
+        });
     }
 }
