@@ -29,7 +29,7 @@ export default class MostUsedWordsPlugin extends Plugin {
     async onload() {
         await this.loadSettings();
 
-        this.addRibbonIcon('document', 'Show most used words graph', async () => {
+        this.addRibbonIcon('bar-chart-2', 'Show Most Used Words', async () => {
             await this.showMostUsedWordsGraph();
         });
 
@@ -138,7 +138,7 @@ export default class MostUsedWordsPlugin extends Plugin {
         }
 
         if (this.settings.excludeCommonWords) {
-            const commonWords = new Set(['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'me', 'they', 'is', 'it']); 
+            const commonWords = new Set(['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'me', 'they', 'is', 'it']);
             wordCountMap.forEach((count, word) => {
                 if (commonWords.has(word)) {
                     wordCountMap.delete(word);
