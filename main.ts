@@ -226,6 +226,48 @@ class MostUsedWordsView extends View {
 
     onload() {
         this.renderChart();
+        this.registerEvent(this.app.workspace.on('css-change', () => {
+            if (this.chart) {
+                this.updateChartColors();
+            }
+        }));
+    }
+
+    getChartColors() {
+        const computedStyle = getComputedStyle(document.body);
+        return {
+            accent: computedStyle.getPropertyValue('--interactive-accent').trim(),
+            text: computedStyle.getPropertyValue('--text-normal').trim(),
+            grid: computedStyle.getPropertyValue('--background-modifier-border').trim(),
+        };
+    }
+
+    updateChartColors() {
+        if (!this.chart) return;
+        const colors = this.getChartColors();
+
+        this.chart.data.datasets[0].backgroundColor = colors.accent + '80';
+        this.chart.data.datasets[0].borderColor = colors.accent;
+
+        const scales = this.chart.options.scales;
+        if (scales) {
+            if (scales.y) {
+                const yScale = scales.y as any;
+                if (yScale.ticks) yScale.ticks.color = colors.text;
+                if (yScale.grid) yScale.grid.color = colors.grid;
+            }
+            if (scales.x) {
+                const xScale = scales.x as any;
+                if (xScale.ticks) xScale.ticks.color = colors.text;
+                if (xScale.grid) xScale.grid.color = colors.grid;
+            }
+        }
+
+        if (this.chart.options.plugins?.legend?.labels) {
+            this.chart.options.plugins.legend.labels.color = colors.text;
+        }
+
+        this.chart.update();
     }
 
     updateContent(labels: string[], data: number[]) {
@@ -239,6 +281,7 @@ class MostUsedWordsView extends View {
     }
 
     renderChart() {
+        const colors = this.getChartColors();
         const canvas = document.createElement('canvas');
         canvas.width = 400;
         canvas.height = 300;
@@ -252,13 +295,37 @@ class MostUsedWordsView extends View {
                     labels: this.labels,
                     datasets: [{
                         label: 'Word count',
-                        data: this.data
+                        data: this.data,
+                        backgroundColor: colors.accent + '80',
+                        borderColor: colors.accent,
+                        borderWidth: 1
                     }]
                 },
                 options: {
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: colors.text
+                            }
+                        }
+                    },
                     scales: {
                         y: {
-                            beginAtZero: true
+                            beginAtZero: true,
+                            ticks: {
+                                color: colors.text
+                            },
+                            grid: {
+                                color: colors.grid
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: colors.text
+                            },
+                            grid: {
+                                color: colors.grid
+                            }
                         }
                     }
                 }
