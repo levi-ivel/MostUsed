@@ -23,6 +23,7 @@ const DEFAULT_SETTINGS: MostUsedWordsPluginSettings = {
 
 export default class MostUsedWordsPlugin extends Plugin {
     private wordCountMap: Map<string, number> = new Map();
+    private debounceTimer: ReturnType<typeof setTimeout> | null = null;
     public activeView: MostUsedWordsView | null = null;
     public settings: MostUsedWordsPluginSettings;
 
@@ -53,17 +54,20 @@ export default class MostUsedWordsPlugin extends Plugin {
     }
 
     async showMostUsedWordsGraph() {
-        if (!this.activeView) {
-            await this.calculateWordCountMap();
-            const sortedWords = this.getSortedWords();
-            const topWords = sortedWords.slice(0, 100);
-            const labels = topWords.map(([word]) => word);
-            const data = topWords.map(([_, count]) => count);
-            const leaf = this.app.workspace.getLeaf();
-            const view = new MostUsedWordsView(leaf, labels, data, this);
-            leaf.open(view);
-            this.activeView = view;
+        if (this.activeView) {
+            this.app.workspace.revealLeaf(this.activeView.leaf);
+            return;
         }
+
+        await this.calculateWordCountMap();
+        const sortedWords = this.getSortedWords();
+        const topWords = sortedWords.slice(0, 100);
+        const labels = topWords.map(([word]) => word);
+        const data = topWords.map(([_, count]) => count);
+        const leaf = this.app.workspace.getLeaf();
+        const view = new MostUsedWordsView(leaf, labels, data, this);
+        await leaf.open(view);
+        this.activeView = view;
     }
 
     async calculateWordCountMap() {
@@ -75,31 +79,39 @@ export default class MostUsedWordsPlugin extends Plugin {
         if (this.settings.scanOption === 'vault') {
             notes = vault.getMarkdownFiles();
         } else if (this.settings.scanOption === 'folder') {
-            const folder = vault.getAbstractFileByPath(this.settings.folderPath) as TFolder;
+            const folder = vault.getAbstractFileByPath(this.settings.folderPath);
             if (folder && folder instanceof TFolder) {
                 notes = await this.getAllMarkdownFilesFromFolder(folder);
+            } else if (this.settings.folderPath) {
+                console.warn(`MostUsedWords: Folder not found: ${this.settings.folderPath}`);
             }
         } else if (this.settings.scanOption === 'note') {
             let notePath = this.settings.notePath.trim();
             if (!notePath.endsWith('.md')) {
                 notePath += '.md';
             }
-            const note = vault.getAbstractFileByPath(notePath) as TFile;
+            const note = vault.getAbstractFileByPath(notePath);
             if (note && note instanceof TFile) {
                 notes = [note];
+            } else if (this.settings.notePath) {
+                console.warn(`MostUsedWords: Note not found: ${notePath}`);
             }
         }
 
         for (const note of notes) {
-            const content = await vault.read(note);
-            const words = content.split(/\s+/);
-            words.forEach(word => {
-                const normalizedWord = word.toLowerCase().replace(/[^a-zA-Z0-9#]/g, '');
-                if (normalizedWord.length > 0) {
-                    const count = currentWordCountMap.get(normalizedWord) || 0;
-                    currentWordCountMap.set(normalizedWord, count + 1);
-                }
-            });
+            try {
+                const content = await vault.read(note);
+                const words = content.split(/\s+/);
+                words.forEach(word => {
+                    const normalizedWord = word.toLowerCase().replace(/[^\p{L}\p{N}#]/gu, '');
+                    if (normalizedWord.length > 0) {
+                        const count = currentWordCountMap.get(normalizedWord) || 0;
+                        currentWordCountMap.set(normalizedWord, count + 1);
+                    }
+                });
+            } catch (err) {
+                console.error(`MostUsedWords: Error reading file ${note.path}:`, err);
+            }
         }
 
         this.applySettingsFilters(currentWordCountMap);
@@ -117,50 +129,64 @@ export default class MostUsedWordsPlugin extends Plugin {
     }
 
     async getAllMarkdownFilesFromFolder(folder: TFolder): Promise<TFile[]> {
-        let files: TFile[] = [];
+        const files: TFile[] = [];
         for (const file of folder.children) {
             if (file instanceof TFile && file.extension === 'md') {
                 files.push(file);
             } else if (file instanceof TFolder) {
-                files = files.concat(await this.getAllMarkdownFilesFromFolder(file));
+                files.push(...await this.getAllMarkdownFilesFromFolder(file));
             }
         }
         return files;
     }
 
     applySettingsFilters(wordCountMap: Map<string, number>) {
-        if (this.settings.excludeNumbers) {
-            wordCountMap.forEach((count, word) => {
-                if (!isNaN(Number(word))) {
-                    wordCountMap.delete(word);
-                }
-            });
+        const wordsToDelete: string[] = [];
+
+        const commonWords = this.settings.excludeCommonWords ? new Set([
+            'the', 'be', 'to', 'of', 'and', 'a', 'an', 'in', 'that', 'have', 'has', 'had',
+            'i', 'me', 'my', 'we', 'our', 'you', 'your', 'they', 'their', 'them',
+            'is', 'are', 'was', 'were', 'been', 'being', 'it', 'its',
+            'he', 'she', 'him', 'her', 'us',
+            'for', 'on', 'with', 'at', 'by', 'from', 'as', 'or', 'but', 'not',
+            'this', 'these', 'those', 'what', 'which', 'who', 'whom',
+            'if', 'then', 'so', 'than', 'too', 'very', 'just', 'about',
+            'can', 'could', 'will', 'would', 'should', 'may', 'might', 'must',
+            'do', 'does', 'did', 'done', 'doing', 'get', 'got', 'getting',
+            'no', 'yes', 'all', 'any', 'some', 'each', 'every', 'both', 'few', 'more', 'most',
+            'other', 'into', 'over', 'such', 'only', 'own', 'same', 'also', 'how', 'after', 'before',
+            'well', 'way', 'even', 'back', 'now', 'one', 'two', 'new', 'first', 'last', 'many',
+            'here', 'there', 'when', 'where', 'why',
+            'up', 'down', 'out', 'off'
+        ]) : null;
+
+        const customExcludedWords = this.settings.customExcludedWords ? new Set(
+            this.settings.customExcludedWords.split('\n').map(w => w.trim().toLowerCase())
+        ) : null;
+
+        for (const [word] of wordCountMap) {
+            if (this.settings.excludeNumbers && !isNaN(Number(word))) {
+                wordsToDelete.push(word);
+                continue;
+            }
+
+            if (commonWords && commonWords.has(word)) {
+                wordsToDelete.push(word);
+                continue;
+            }
+
+            if (this.settings.excludeTags && word.startsWith('#')) {
+                wordsToDelete.push(word);
+                continue;
+            }
+
+            if (customExcludedWords && customExcludedWords.has(word)) {
+                wordsToDelete.push(word);
+            }
         }
 
-        if (this.settings.excludeCommonWords) {
-            const commonWords = new Set(['the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i', 'me', 'they', 'is', 'it']);
-            wordCountMap.forEach((count, word) => {
-                if (commonWords.has(word)) {
-                    wordCountMap.delete(word);
-                }
-            });
-        }
-
-        if (this.settings.excludeTags) {
-            wordCountMap.forEach((count, word) => {
-                if (word.startsWith('#')) {
-                    wordCountMap.delete(word);
-                }
-            });
-        }
-
-        if (this.settings.customExcludedWords) {
-            const customExcludedWords = new Set(this.settings.customExcludedWords.split('\n').map(word => word.trim().toLowerCase()));
-            wordCountMap.forEach((count, word) => {
-                if (customExcludedWords.has(word)) {
-                    wordCountMap.delete(word);
-                }
-            });
+        for (const word of wordsToDelete) {
+            wordCountMap.delete(word);
         }
     }
 
@@ -169,17 +195,20 @@ export default class MostUsedWordsPlugin extends Plugin {
     }
 
     handleFileOpen(file: TFile) {
-        this.calculateWordCountMap();
+        this.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
     }
 
     handleEditorChange() {
-        this.calculateWordCountMap();
+        if (this.debounceTimer) clearTimeout(this.debounceTimer);
+        this.debounceTimer = setTimeout(() => {
+            this.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
+        }, 300);
     }
 
     handleActiveLeafChange(leaf: WorkspaceLeaf | null) {
         if (leaf && leaf.view instanceof MostUsedWordsView) {
             this.activeView = leaf.view;
-            this.calculateWordCountMap();
+            this.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
         }
     }
 
@@ -251,15 +280,13 @@ class MostUsedWordsView extends View {
 
         const scales = this.chart.options.scales;
         if (scales) {
-            if (scales.y) {
-                const yScale = scales.y as any;
-                if (yScale.ticks) yScale.ticks.color = colors.text;
-                if (yScale.grid) yScale.grid.color = colors.grid;
+            if (scales['y']) {
+                if (scales['y'].ticks) scales['y'].ticks.color = colors.text;
+                if (scales['y'].grid) scales['y'].grid.color = colors.grid;
             }
-            if (scales.x) {
-                const xScale = scales.x as any;
-                if (xScale.ticks) xScale.ticks.color = colors.text;
-                if (xScale.grid) xScale.grid.color = colors.grid;
+            if (scales['x']) {
+                if (scales['x'].ticks) scales['x'].ticks.color = colors.text;
+                if (scales['x'].grid) scales['x'].grid.color = colors.grid;
             }
         }
 
@@ -281,6 +308,7 @@ class MostUsedWordsView extends View {
     }
 
     renderChart() {
+        this.containerEl.empty();
         const colors = this.getChartColors();
         const canvas = document.createElement('canvas');
         canvas.width = 400;
@@ -378,7 +406,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.excludeNumbers = value;
                     await this.plugin.saveSettings();
-                    this.plugin.calculateWordCountMap();
+                    this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
                 }));
 
         new Setting(containerEl)
@@ -389,7 +417,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.excludeCommonWords = value;
                     await this.plugin.saveSettings();
-                    this.plugin.calculateWordCountMap();
+                    this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
                 }));
 
         new Setting(containerEl)
@@ -400,7 +428,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                 .onChange(async (value: boolean) => {
                     this.plugin.settings.excludeTags = value;
                     await this.plugin.saveSettings();
-                    this.plugin.calculateWordCountMap();
+                    this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
                 }));
 
         new Setting(containerEl)
@@ -411,7 +439,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                 .onChange(async (value: string) => {
                     this.plugin.settings.customExcludedWords = value;
                     await this.plugin.saveSettings();
-                    this.plugin.calculateWordCountMap();
+                    this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
                 }));
 
         new Setting(containerEl)
@@ -427,7 +455,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                 .onChange(async (value: 'vault' | 'folder' | 'note') => {
                     this.plugin.settings.scanOption = value;
                     await this.plugin.saveSettings();
-                    this.plugin.calculateWordCountMap();
+                    this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
                 }));
 
         new Setting(containerEl)
@@ -438,7 +466,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                 .onChange(async (value: string) => {
                     this.plugin.settings.folderPath = value;
                     await this.plugin.saveSettings();
-                    this.plugin.calculateWordCountMap();
+                    this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
                 }));
 
         new Setting(containerEl)
@@ -449,7 +477,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                 .onChange(async (value: string) => {
                     this.plugin.settings.notePath = value;
                     await this.plugin.saveSettings();
-                    this.plugin.calculateWordCountMap();
+                    this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
                 }));
 
         new Setting(containerEl)
@@ -486,7 +514,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
             link.href = url;
             link.download = 'word-list.txt';
             link.click();
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
         });
 
         buttonContainer.createEl('button', { text: 'Export as .json' }).addEventListener('click', async () => {
@@ -497,7 +525,7 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
             link.href = url;
             link.download = 'word-list.json';
             link.click();
-            URL.revokeObjectURL(url);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
         });
 
         buttonContainer.createEl('button', { text: 'Back to Settings' }).addEventListener('click', () => {
