@@ -330,6 +330,22 @@ class MostUsedWordsView extends View {
                     }]
                 },
                 options: {
+                    onClick: (event, elements) => {
+                        if (elements.length > 0) {
+                            const index = elements[0].index;
+                            const word = this.labels[index];
+                            const searchPlugin = (this.app as any).internalPlugins.getPluginById('global-search');
+                            if (searchPlugin && searchPlugin.instance) {
+                                searchPlugin.instance.openGlobalSearch(word);
+                            }
+                        }
+                    },
+                    onHover: (event, elements) => {
+                        const target = event.native?.target as HTMLElement;
+                        if (target) {
+                            target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                        }
+                    },
                     plugins: {
                         legend: {
                             labels: {
