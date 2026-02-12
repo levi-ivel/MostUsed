@@ -565,21 +565,42 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
             .setDesc('View and export the complete word list with their frequencies')
             .addButton(button => button
                 .setButtonText('Show List')
-                .onClick(() => this.showFullWordList(containerEl)));
+                .onClick(async () => await this.showFullWordList(containerEl)));
     }
 
-    showFullWordList(containerEl: HTMLElement) {
+    async showFullWordList(containerEl: HTMLElement) {
         containerEl.empty();
         containerEl.createEl('h2', { text: 'Complete Word List' });
 
+        if (this.plugin.getSortedWords().length === 0) {
+            await this.plugin.calculateWordCountMap();
+        }
+
+        const buttonContainer = containerEl.createEl('div', { cls: 'button-container' });
+        buttonContainer.setCssStyles({
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '10px',
+            marginBottom: '20px',
+            position: 'sticky',
+            top: '0',
+            backgroundColor: 'var(--background-primary)',
+            padding: '10px 0',
+            zIndex: '1',
+            borderBottom: '1px solid var(--background-modifier-border)'
+        });
+
         const wordListContainer = containerEl.createEl('div', { cls: 'word-list-container' });
+        wordListContainer.setCssStyles({
+            maxHeight: '60vh',
+            overflowY: 'auto',
+            paddingRight: '10px'
+        });
 
         const sortedWords = this.plugin.getSortedWords();
         sortedWords.forEach(([word, count]) => {
             wordListContainer.createEl('div', { text: `${word}: ${count}` });
         });
-
-        const buttonContainer = containerEl.createEl('div', { cls: 'button-container' });
 
         buttonContainer.createEl('button', { text: 'Copy to Clipboard' }).addEventListener('click', () => {
             const text = sortedWords.map(([word, count]) => `${word}: ${count}`).join('\n');
@@ -604,6 +625,17 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
             const link = document.createElement('a');
             link.href = url;
             link.download = 'word-list.json';
+            link.click();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        });
+
+        buttonContainer.createEl('button', { text: 'Export as .csv' }).addEventListener('click', async () => {
+            const csv = 'Word,Count\n' + sortedWords.map(([word, count]) => `"${word.replace(/"/g, '""')}",${count}`).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'word-list.csv';
             link.click();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
         });
