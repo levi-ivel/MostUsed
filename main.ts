@@ -9,6 +9,8 @@ interface MostUsedWordsPluginSettings {
     scanOption: 'vault' | 'folder' | 'note';
     folderPath: string;
     notePath: string;
+    wordRegex: string;
+    exclusionRegex: string;
 }
 
 const DEFAULT_SETTINGS: MostUsedWordsPluginSettings = {
@@ -19,6 +21,8 @@ const DEFAULT_SETTINGS: MostUsedWordsPluginSettings = {
     scanOption: 'vault',
     folderPath: '',
     notePath: '',
+    wordRegex: '',
+    exclusionRegex: '',
 };
 
 export default class MostUsedWordsPlugin extends Plugin {
@@ -98,17 +102,38 @@ export default class MostUsedWordsPlugin extends Plugin {
             }
         }
 
+        let wordExtractRegex: RegExp | null = null;
+        if (this.settings.wordRegex) {
+            try {
+                wordExtractRegex = new RegExp(this.settings.wordRegex, 'gu');
+            } catch (e) {
+                console.error('MostUsedWords: Invalid word extraction regex', e);
+            }
+        }
+
         for (const note of notes) {
             try {
                 const content = await vault.read(note);
-                const words = content.split(/\s+/);
-                words.forEach(word => {
-                    const normalizedWord = word.toLowerCase().replace(/[^\p{L}\p{N}#]/gu, '');
-                    if (normalizedWord.length > 0) {
-                        const count = currentWordCountMap.get(normalizedWord) || 0;
-                        currentWordCountMap.set(normalizedWord, count + 1);
+                if (wordExtractRegex) {
+                    const matches = content.matchAll(wordExtractRegex);
+                    for (const match of matches) {
+                        const word = match[0];
+                        const normalizedWord = word.toLowerCase();
+                        if (normalizedWord.length > 0) {
+                            const count = currentWordCountMap.get(normalizedWord) || 0;
+                            currentWordCountMap.set(normalizedWord, count + 1);
+                        }
                     }
-                });
+                } else {
+                    const words = content.split(/\s+/);
+                    words.forEach(word => {
+                        const normalizedWord = word.toLowerCase().replace(/[^\p{L}\p{N}#]/gu, '');
+                        if (normalizedWord.length > 0) {
+                            const count = currentWordCountMap.get(normalizedWord) || 0;
+                            currentWordCountMap.set(normalizedWord, count + 1);
+                        }
+                    });
+                }
             } catch (err) {
                 console.error(`MostUsedWords: Error reading file ${note.path}:`, err);
             }
@@ -164,7 +189,20 @@ export default class MostUsedWordsPlugin extends Plugin {
             this.settings.customExcludedWords.split('\n').map(w => w.trim().toLowerCase())
         ) : null;
 
+        let excludeRegex: RegExp | null = null;
+        if (this.settings.exclusionRegex) {
+            try {
+                excludeRegex = new RegExp(this.settings.exclusionRegex, 'i');
+            } catch (e) {
+                console.error('MostUsedWords: Invalid exclusion regex', e);
+            }
+        }
+
         for (const [word] of wordCountMap) {
+            if (excludeRegex && excludeRegex.test(word)) {
+                wordsToDelete.push(word);
+                continue;
+            }
             if (this.settings.excludeNumbers && !isNaN(Number(word))) {
                 wordsToDelete.push(word);
                 continue;
@@ -492,6 +530,32 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                 .setValue(this.plugin.settings.notePath)
                 .onChange(async (value: string) => {
                     this.plugin.settings.notePath = value;
+                    await this.plugin.saveSettings();
+                    this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
+                }));
+
+        containerEl.createEl('h3', { text: 'Regex Support' });
+
+        new Setting(containerEl)
+            .setName('Word Extraction Regex')
+            .setDesc('Custom regex to extract words. If empty, the default separator is used. E.g: [\\w#]+ to include words and tags.')
+            .addText(text => text
+                .setPlaceholder('[\\w#]+')
+                .setValue(this.plugin.settings.wordRegex)
+                .onChange(async (value: string) => {
+                    this.plugin.settings.wordRegex = value;
+                    await this.plugin.saveSettings();
+                    this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
+                }));
+
+        new Setting(containerEl)
+            .setName('Word Exclusion Regex')
+            .setDesc('Exclude words matching this regex. Case-insensitive.')
+            .addText(text => text
+                .setPlaceholder('^\\d+$')
+                .setValue(this.plugin.settings.exclusionRegex)
+                .onChange(async (value: string) => {
+                    this.plugin.settings.exclusionRegex = value;
                     await this.plugin.saveSettings();
                     this.plugin.calculateWordCountMap().catch(err => console.error('Error calculating word count:', err));
                 }));
