@@ -1,6 +1,6 @@
 {
 	"name": "most-used",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Creates a top 100 of the most used words in your notes",
 	"main": "main.js",
 	"scripts": {
@@ -18,7 +18,7 @@
 		"@typescript-eslint/parser": "5.29.0",
 		"builtin-modules": "3.3.0",
 		"esbuild": "0.25.0",
-		"obsidian": "latest",
+		"obsidian": "^1.0.0",
 		"tslib": "2.4.0",
 		"typescript": "^5.9.3"
 	},

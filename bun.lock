@@ -5,17 +5,17 @@
     "": {
       "name": "most-used",
       "dependencies": {
-        "chart.js": "^4.4.2",
+        "chart.js": "^4.5.1",
       },
       "devDependencies": {
-        "@types/node": "^16.11.6",
+        "@types/node": "^16.18.126",
         "@typescript-eslint/eslint-plugin": "5.29.0",
         "@typescript-eslint/parser": "5.29.0",
         "builtin-modules": "3.3.0",
         "esbuild": "0.25.0",
-        "obsidian": "latest",
+        "obsidian": "^1.0.0",
         "tslib": "2.4.0",
-        "typescript": "^5.7.0",
+        "typescript": "^5.9.3",
       },
     },
   },
