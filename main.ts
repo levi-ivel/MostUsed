@@ -25,6 +25,7 @@ export default class MostUsedWordsPlugin extends Plugin {
     private wordCountMap: Map<string, number> = new Map();
     public activeView: MostUsedWordsView | null = null;
     public settings!: MostUsedWordsPluginSettings;
+    private debounceTimer: number | null = null;
 
     async onload() {
         await this.loadSettings();
@@ -173,7 +174,10 @@ export default class MostUsedWordsPlugin extends Plugin {
     }
 
     handleEditorChange() {
-        this.calculateWordCountMap();
+        if (this.debounceTimer) clearTimeout(this.debounceTimer);
+        this.debounceTimer = window.setTimeout(() => {
+            this.calculateWordCountMap();
+        }, 300);
     }
 
     handleActiveLeafChange(leaf: WorkspaceLeaf | null) {
@@ -190,6 +194,7 @@ export default class MostUsedWordsPlugin extends Plugin {
     }
 
     onunload() {
+        if (this.debounceTimer) clearTimeout(this.debounceTimer);
         this.wordCountMap.clear();
         this.closeMostUsedWordsGraph();
     }
