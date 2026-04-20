@@ -24,7 +24,7 @@ const DEFAULT_SETTINGS: MostUsedWordsPluginSettings = {
 export default class MostUsedWordsPlugin extends Plugin {
     private wordCountMap: Map<string, number> = new Map();
     public activeView: MostUsedWordsView | null = null;
-    public settings: MostUsedWordsPluginSettings;
+    public settings!: MostUsedWordsPluginSettings;
 
     async onload() {
         await this.loadSettings();
@@ -43,9 +43,9 @@ export default class MostUsedWordsPlugin extends Plugin {
 
         this.addSettingTab(new MostUsedWordsSettingTab(this.app, this));
 
-        this.registerEvent(this.app.workspace.on('file-open', this.handleFileOpen.bind(this)));
-        this.registerEvent(this.app.workspace.on('editor-change', this.handleEditorChange.bind(this)));
-        this.registerEvent(this.app.workspace.on('active-leaf-change', this.handleActiveLeafChange.bind(this)));
+        this.registerEvent(this.app.workspace.on('file-open', (file: TFile | null) => this.handleFileOpen(file)));
+        this.registerEvent(this.app.workspace.on('editor-change', () => this.handleEditorChange()));
+        this.registerEvent(this.app.workspace.on('active-leaf-change' as any, (leaf: WorkspaceLeaf | null) => this.handleActiveLeafChange(leaf)));
 
         this.registerEvent(this.app.workspace.on('quit', () => {
             this.closeMostUsedWordsGraph();
@@ -168,7 +168,7 @@ export default class MostUsedWordsPlugin extends Plugin {
         return Array.from(this.wordCountMap.entries()).sort((a, b) => b[1] - a[1]);
     }
 
-    handleFileOpen(file: TFile) {
+    handleFileOpen(file: TFile | null) {
         this.calculateWordCountMap();
     }
 
@@ -357,8 +357,8 @@ class MostUsedWordsSettingTab extends PluginSettingTab {
                     'note': 'Scan specific note'
                 })
                 .setValue(this.plugin.settings.scanOption)
-                .onChange(async (value: 'vault' | 'folder' | 'note') => {
-                    this.plugin.settings.scanOption = value;
+                .onChange(async (value: string) => {
+                    this.plugin.settings.scanOption = value as 'vault' | 'folder' | 'note';
                     await this.plugin.saveSettings();
                     this.plugin.calculateWordCountMap();
                 }));
